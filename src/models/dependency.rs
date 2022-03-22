@@ -20,6 +20,7 @@ pub struct Dependency {
     pub features: Vec<String>,
     pub target: Option<String>,
     pub kind: DependencyKind,
+    pub explicit_name: Option<String>,
 }
 
 #[derive(Debug, QueryableByName)]
@@ -41,6 +42,16 @@ pub enum DependencyKind {
     Build = 1,
     Dev = 2,
     // if you add a kind here, be sure to update `from_row` below.
+}
+
+impl From<cargo_registry_index::DependencyKind> for DependencyKind {
+    fn from(dk: cargo_registry_index::DependencyKind) -> Self {
+        match dk {
+            cargo_registry_index::DependencyKind::Normal => DependencyKind::Normal,
+            cargo_registry_index::DependencyKind::Build => DependencyKind::Build,
+            cargo_registry_index::DependencyKind::Dev => DependencyKind::Dev,
+        }
+    }
 }
 
 impl From<DependencyKind> for IndexDependencyKind {
