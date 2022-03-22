@@ -17,12 +17,21 @@ pub fn add_crate(env: &Environment, krate: Crate) -> Result<(), PerformError> {
 
     // Add the crate to its relevant file
     fs::create_dir_all(dst.parent().unwrap())?;
-    let mut file = OpenOptions::new().append(true).create(true).open(&dst)?;
+    let mut file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .read(true)
+        .open(&dst)?;
     serde_json::to_writer(&mut file, &krate)?;
     file.write_all(b"\n")?;
 
-    let message: String = format!("Updating crate `{}#{}`", krate.name, krate.vers);
+    file.rewind()?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+    env.uploader
+        .upload_index(env.http_client(), &krate.name, contents)?;
 
+    let message: String = format!("Updating crate `{}#{}`", krate.name, krate.vers);
     repo.commit_and_push(&message, &dst)?;
 
     Ok(())

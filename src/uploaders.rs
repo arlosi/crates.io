@@ -13,6 +13,7 @@ use crate::models::Crate;
 
 const CACHE_CONTROL_IMMUTABLE: &str = "public,max-age=31536000,immutable";
 const CACHE_CONTROL_README: &str = "public,max-age=604800";
+const CACHE_CONTROL_INDEX: &str = "public,max-age=600";
 
 #[derive(Clone, Debug)]
 pub enum Uploader {
@@ -80,6 +81,17 @@ impl Uploader {
     /// Returns the internal path of an uploaded crate's version readme.
     fn readme_path(name: &str, version: &str) -> String {
         format!("readmes/{name}/{name}-{version}.html")
+    }
+
+    /// Returns the internal path of an uploaded crate's index file.
+    fn index_path(name: &str) -> String {
+        let prefix = match name.len() {
+            1 => String::from("1"),
+            2 => String::from("2"),
+            3 => format!("3/{}", &name[..1]),
+            _ => format!("{}/{}", &name[0..2], &name[2..4]),
+        };
+        format!("index/{prefix}/{name}")
     }
 
     /// Uploads a file using the configured uploader (either `S3`, `Local`).
@@ -171,6 +183,31 @@ impl Uploader {
             content,
             content_length,
             "text/html",
+            extra_headers,
+        )?;
+        Ok(())
+    }
+
+    pub(crate) fn upload_index(
+        &self,
+        http_client: &Client,
+        crate_name: &str,
+        index: String,
+    ) -> Result<()> {
+        let path = Uploader::index_path(crate_name);
+        let content_length = index.len() as u64;
+        let content = Cursor::new(index);
+        let mut extra_headers = header::HeaderMap::new();
+        extra_headers.insert(
+            header::CACHE_CONTROL,
+            header::HeaderValue::from_static(CACHE_CONTROL_INDEX),
+        );
+        self.upload(
+            http_client,
+            &path,
+            content,
+            content_length,
+            "text/plain",
             extra_headers,
         )?;
         Ok(())
