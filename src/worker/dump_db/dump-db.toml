@@ -110,6 +110,7 @@ default_features = "public"
 features = "public"
 target = "public"
 kind = "public"
+explicit_name = "public"
 
 [__diesel_schema_migrations.columns]
 version = "private"
@@ -212,6 +213,7 @@ yanked = "public"
 license = "public"
 crate_size = "public"
 published_by = "public"
+checksum = "public"
 
 [versions_published_by.columns]
 version_id = "private"

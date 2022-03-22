@@ -7,6 +7,8 @@
 use std::cmp::Reverse;
 use std::str::FromStr;
 
+use conduit::{Response, Body};
+
 use crate::controllers::frontend_prelude::*;
 use crate::controllers::helpers::pagination::PaginationOptions;
 
@@ -395,4 +397,67 @@ pub fn reverse_dependencies(req: &mut dyn RequestExt) -> EndpointResult {
         "versions": versions,
         "meta": { "total": total },
     })))
+}
+
+pub fn config_json(req: &mut dyn RequestExt) -> EndpointResult {
+    let dl = "https://localhost/api/v1/crates".to_string();
+    let api= "https://localhost/".to_string();
+
+    #[derive(Serialize)]
+    struct R {
+        dl: String,
+        api: String,
+    }
+    Ok(req.json(&R { dl, api }))
+}
+
+pub fn versions_registry(req: &mut dyn RequestExt) -> EndpointResult {
+    let crate_name = &req.params()["crate_id"];
+    let conn = req.db_read_only()?;
+    let krate: Crate = Crate::by_name(crate_name).first(&*conn)?;
+
+    let versions: Vec<Version> = krate
+        .all_versions()
+        .load(&*conn)?;
+
+    let mut body = Vec::new();
+
+    for v in versions {
+        let deps = v.dependencies(&conn).unwrap().into_iter().map(|(dep, name)| {
+            let (name, package) = match dep.explicit_name {
+                Some(explicit_name) => (explicit_name, Some(name)),
+                None => (name, None),
+            };
+            cargo_registry_index::Dependency {
+                name,
+                req: dep.req,
+                features: dep.features,
+                optional: dep.optional,
+                default_features: dep.default_features,
+                kind: Some(dep.kind.into()),
+                package,
+                target: dep.target,
+            }
+        }).collect();
+        let features= serde_json::from_value(v.features).unwrap_or_default();
+        let krate = cargo_registry_index::Crate {
+            name: crate_name.clone(),
+            vers: v.num.to_string(),
+            cksum: v.checksum.unwrap_or_default(),
+            yanked: Some(v.yanked),
+            deps,
+            features,
+            links: None,
+            features2: None, // TODO
+            v: None, // TODO
+        };
+        serde_json::to_writer(&mut body, &krate).unwrap();
+        body.push(b'\n');
+    }
+
+    Ok(Response::builder()
+        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+        .header(header::CONTENT_LENGTH, body.len())
+        .body(Body::from_vec(body))
+        .unwrap()) // Header values are well formed, so should not panic
 }

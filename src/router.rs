@@ -157,6 +157,16 @@ pub fn build_router(app: &App) -> RouteBuilder {
         C(crate_owner_invitation::private_list),
     );
 
+    // Handles http index
+    router.get(
+        "/api/index/:x1/:x2/:crate_id",
+        C(krate::metadata::versions_registry)
+    );
+    router.get(
+        "/api/index/:x1/:crate_id",
+        C(krate::metadata::versions_registry)
+    );
+
     // Only serve the local checkout of the git index in development mode.
     // In production, for crates.io, cargo gets the index from
     // https://github.com/rust-lang/crates.io-index directly.
