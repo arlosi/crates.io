@@ -6,7 +6,6 @@ use flate2::read::GzDecoder;
 use hex::ToHex;
 use hyper::body::Buf;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::Path;
 
@@ -247,12 +246,7 @@ pub async fn publish(app: AppState, req: BytesRequest) -> AppResult<Json<GoodCra
                 .uploader()
                 .upload_crate(app.http_client(), tarball_bytes, &krate, vers)?;
 
-            let (features, features2): (BTreeMap<_, _>, BTreeMap<_, _>) =
-                features.into_iter().partition(|(_k, vals)| {
-                    !vals
-                        .iter()
-                        .any(|v| v.starts_with("dep:") || v.contains("?/"))
-                });
+            let (features, features2) = Crate::partition_features(features);
             let (features2, v) = if features2.is_empty() {
                 (None, None)
             } else {

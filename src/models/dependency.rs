@@ -44,6 +44,16 @@ pub enum DependencyKind {
     // if you add a kind here, be sure to update `from_row` below.
 }
 
+impl From<cargo_registry_index::DependencyKind> for DependencyKind {
+    fn from(dk: cargo_registry_index::DependencyKind) -> Self {
+        match dk {
+            cargo_registry_index::DependencyKind::Normal => DependencyKind::Normal,
+            cargo_registry_index::DependencyKind::Build => DependencyKind::Build,
+            cargo_registry_index::DependencyKind::Dev => DependencyKind::Dev,
+        }
+    }
+}
+
 impl From<DependencyKind> for IndexDependencyKind {
     fn from(dk: DependencyKind) -> Self {
         match dk {

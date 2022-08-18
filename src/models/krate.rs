@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::NaiveDateTime;
 use diesel::associations::Identifiable;
 use diesel::pg::Pg;
@@ -431,6 +433,76 @@ impl Crate {
                 .load(conn)?;
 
         Ok(rows.records_and_total())
+    }
+
+    /// Partition the features list into (features, features2)
+    pub fn partition_features(
+        features: BTreeMap<String, Vec<String>>,
+    ) -> (BTreeMap<String, Vec<String>>, BTreeMap<String, Vec<String>>) {
+        features.into_iter().partition(|(_k, vals)| {
+            !vals
+                .iter()
+                .any(|v| v.starts_with("dep:") || v.contains("?/"))
+        })
+    }
+
+    /// Serialize the crate as an index metadata file
+    pub fn index_metadata(&self, conn: &mut PgConnection) -> QueryResult<Vec<u8>> {
+        let mut versions: Vec<Version> = self.all_versions().load(conn)?;
+        versions.sort_by_cached_key(|k| {
+            semver::Version::parse(&k.num)
+                .expect("version was valid semver when inserted into the database")
+        });
+
+        let mut body = Vec::new();
+        for version in versions {
+            let mut deps: Vec<cargo_registry_index::Dependency> = version
+                .dependencies(conn)?
+                .into_iter()
+                .map(|(dep, name)| {
+                    let (name, package) = match dep.explicit_name {
+                        Some(explicit_name) => (explicit_name, Some(name)),
+                        None => (name, None),
+                    };
+                    cargo_registry_index::Dependency {
+                        name,
+                        req: dep.req,
+                        features: dep.features,
+                        optional: dep.optional,
+                        default_features: dep.default_features,
+                        kind: Some(dep.kind.into()),
+                        package,
+                        target: dep.target,
+                    }
+                })
+                .collect();
+            deps.sort();
+
+            let features: BTreeMap<String, Vec<String>> =
+                serde_json::from_value(version.features).unwrap_or_default();
+            let (features, features2) = Self::partition_features(features);
+            let (features, features2, v) = if features2.is_empty() {
+                (features, None, None)
+            } else {
+                (features, Some(features2), Some(2))
+            };
+
+            let krate = cargo_registry_index::Crate {
+                name: self.name.clone(),
+                vers: version.num.to_string(),
+                cksum: version.checksum,
+                yanked: Some(version.yanked),
+                deps,
+                features,
+                links: version.links,
+                features2,
+                v,
+            };
+            serde_json::to_writer(&mut body, &krate).unwrap();
+            body.push(b'\n');
+        }
+
+        Ok(body)
     }
 }
 
