@@ -449,10 +449,7 @@ impl Crate {
     /// Serialize the crate as an index metadata file
     pub fn index_metadata(&self, conn: &mut PgConnection) -> QueryResult<Vec<u8>> {
         let mut versions: Vec<Version> = self.all_versions().load(conn)?;
-        versions.sort_by_cached_key(|k| {
-            semver::Version::parse(&k.num)
-                .expect("version was valid semver when inserted into the database")
-        });
+        versions.sort_by_key(|v| v.created_at);
 
         let mut body = Vec::new();
         for version in versions {

@@ -6,6 +6,7 @@ pub mod git_import;
 pub mod migrate;
 pub mod on_call;
 pub mod populate;
+pub mod regenerate_index;
 pub mod render_readmes;
 pub mod test_pagerduty;
 pub mod transfer_crates;

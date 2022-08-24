@@ -411,6 +411,7 @@ pub fn add_dependencies(
         .values(&new_dependencies)
         .execute(conn)?;
 
+    git_deps.sort();
     Ok(git_deps)
 }
 
