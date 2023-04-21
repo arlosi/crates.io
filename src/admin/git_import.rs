@@ -33,6 +33,7 @@ pub fn run(opts: Opts) -> anyhow::Result<()> {
     let config = RepositoryConfig::from_environment();
     let repo = Repository::open(&config)?;
     repo.reset_head()?;
+    repo.run_command(std::process::Command::new("git").args(["checkout", "9fb832597eae57a3886ca2467cf6183bae88dd5d"]))?;
     println!("HEAD is at {}", repo.head_oid()?);
     let files = repo.get_files_modified_since(None)?;
     println!("found {} crates", files.len());
